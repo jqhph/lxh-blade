@@ -1,7 +1,7 @@
 # lxh-blade
 轻量级js模板引擎
 
-压缩后仅有5.1kb
+本项目只提供一些常用的功能，模板命令的命名风格上参考了lavarel的blade模板引擎，压缩后仅有5.1kb
 
 ## demo
 
@@ -75,7 +75,7 @@ view.fetch(vars)
 view.getTpl()
 ```
 
-## 模板表达式
+## 模板
 
 ```js
 // 普通变量
