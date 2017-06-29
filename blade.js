@@ -65,6 +65,11 @@ function Blade(tpl, vars) {
     store.placeholders.$customTags = BladeConfig.customTags
     var self = this
 
+    // 获取编译变量
+    this.getVars = function () {
+        return store.vars
+    }
+
     this.getTpl = function () {
         return store.tpl
     }
@@ -102,11 +107,7 @@ function Blade(tpl, vars) {
         if (typeof key == 'object') {
             store.vars = key
         } else {
-            if (typeof value == 'object') {
-                store.vars[key] = value
-            } else {
-                store.vars[key] = value
-            }
+            store.vars[key] = value
         }
     }
 
