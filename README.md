@@ -70,15 +70,6 @@ setTimeout(function () {
   }
   view.rerander(vars)
 }, 3000)
-
-/**
- * 添加自定义标签
- *
- * @param string   name 标签名称
- * @param function call 自定义标签处理方法
- *  call回调函数接受3个参数， 1. Blade对象，2. 自定义标签传入的参数数组， 3. 解析后的自定义标签内容字符串
- */ 
-BladeConfig.addTag(name, call)
 ```
 
 ## 接口
@@ -101,8 +92,14 @@ view.fetch(vars)
 // 获取原模板内容
 view.getTpl()
 
-// 添加自定义标签
-
+/**
+ * 添加自定义标签
+ *
+ * @param string   name 标签名称
+ * @param function call 自定义标签处理方法
+ *  call回调函数接受3个参数， 1. Blade对象，2. 自定义标签传入的参数数组， 3. 解析后的自定义标签内容字符串
+ */ 
+BladeConfig.addTag(name, call)
 ```
 
 ## 模板
