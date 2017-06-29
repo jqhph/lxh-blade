@@ -92,6 +92,9 @@ view.fetch(vars)
 // 获取原模板内容
 view.getTpl()
 
+// 获取编译变量对象
+this.getVars()
+
 /**
  * 添加自定义标签
  *
