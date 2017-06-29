@@ -43,7 +43,7 @@ function Blade(tpl, vars) {
         regs: {
             // 普通变量，精确匹配 var: /{([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]+[0-9]*[_]*)+([\[]?[a-z0-9_]*[\]]?))}/gi,
             $var: /{([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]*[0-9]*[_]*)+([\[]?([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]*[0-9]*[_]*)+)[\]]?))}/gi,
-            stringVar: /[\[]([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]+[0-9]*[_]*)+)[\]]/gi,
+            stringVar: /[\[]([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]*[0-9]*[_]*)+)[\]]/gi,
             // js变量（非模板变量）
             jsvar: /[ ]+((?![\'|\"])[\[_\.\]a-z]+[0-9\]]*)+[ ]*/gi,
             $if: /@if[ ]+([\s\S.])+@endif\b/gi,
@@ -315,7 +315,7 @@ function Blade(tpl, vars) {
             if (typeof $lastItem[keys[i]] != 'undefined') {
                 $lastItem = $lastItem[keys[i]]
             } else {
-                return (typeof $default != 'undefined') ? $default : store.delimiter.start + $key + store.delimiter.end
+                return (typeof $default != 'undefined') ? $default : $key
             }
         }
         return $lastItem;
