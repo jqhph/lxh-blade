@@ -1,6 +1,16 @@
 /**
  * Created by Jqh on 2017/6/22.
  */
+
+window.BladeConfig = {
+    customTags: {},
+    // 添加自定义标签
+    addTag: function (name, call) {
+        if (typeof call != 'function')  throw new Error('Invalid argument')
+        this.customTags[name] = call
+    }
+}
+
 function Blade(tpl, vars) {
     var store = {
         // 渲染节点
@@ -24,7 +34,8 @@ function Blade(tpl, vars) {
             $end: '@',
             $tags: {
                 compare: '@compare'
-            }
+            },
+            $customTags: {}
         },
         comparison: {
             // '&gt;': '>', '&lt;': '<', '&amp;': '&'
@@ -34,12 +45,13 @@ function Blade(tpl, vars) {
             $var: /{([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]*[0-9]*[_]*)+([\[]?([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]*[0-9]*[_]*)+)[\]]?))}/gi,
             stringVar: /[\[]([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]+[0-9]*[_]*)+)[\]]/gi,
             // js变量（非模板变量）
-            jsvar: /((?![\'|\"])[\[_\.\]a-z]+[0-9\]]*)+[ ]*/gi,
+            jsvar: /[ ]+((?![\'|\"])[\[_\.\]a-z]+[0-9\]]*)+[ ]*/gi,
             $if: /@if[ ]+([\s\S.])+@endif\b/gi,
             $foreach: /@foreach[ ]+([\s\S.])+@endforeach\b/gi,
             // 标签，精确匹配
             tag: /{(@[^{|{#]+)}/gi,
-            tagName: /@[a-z]*\b/i
+            tagName: /@[a-z]*\b/i,
+            customTag: /{(@[^{|{#]+)@}/gi,
         },
         model: {
             $if: "\n if ({exp}) { \n {content} \n } \n",
@@ -50,6 +62,7 @@ function Blade(tpl, vars) {
 
     store.tpl = tpl
     store.vars = vars || {}
+    store.placeholders.$customTags = BladeConfig.customTags
     var self = this
 
     this.getTpl = function () {
@@ -103,10 +116,26 @@ function Blade(tpl, vars) {
         tpl = parse_expression_foreach(tpl)
         // 标签解析
         tpl = parse_tag(tpl)
+        // 自定义标签解析
+        tpl = parse_custom_tag(tpl)
         // if
         tpl = parse_expression_if(tpl)
         // values = values.replace(/[\s\n]/gi, "")
         return (tpl != 'undefined' ? tpl : '')
+    }
+
+    // 自定义标签解析
+    var parse_custom_tag = function (tpl) {
+        return tpl.replace(store.regs.customTag, function (full, $match, position) {
+            var tagName = $match.match(store.regs.tagName), $match = $match.replace(tagName[0], "")
+            tagName = tagName[0].replace(store.placeholders.$end, '')
+            for (var i in store.placeholders.$customTags) {
+                if (i == tagName) {
+                    return store.placeholders.$customTags[i](self, trim(compile_tags.transVar($match, false).replace(/'|"/g, '')).split(' '))
+                }
+            }
+            return full
+        })
     }
 
     // 标签解析
@@ -136,18 +165,18 @@ function Blade(tpl, vars) {
                 if (content[i].indexOf("'") != -1 || content[i].indexOf('"') != -1 ) {
                     exp += ' var result = ' + content[i]
                 } else {
-                    exp += ' var result = ' + this.transVar(content[i])
+                    exp += ' var result = ' + this.transVar(content[i], true)
                 }
             }
-            exp = 'if (' + this.transVar(tagContent[0]) + ') ' + exp + '}'
+            exp = 'if (' + this.transVar(tagContent[0], true) + ') ' + exp + '}'
             eval(exp)
             return result || ''
 
         },
         // 翻译变量
-        transVar: function (tpl) {
+        transVar: function (tpl, toString) {
             return tpl.replace(store.regs.jsvar, function (full, $match) {
-                return trans_var($match, null, true)
+                return trans_var($match, null, toString) + ' '
             })
         },
         compareSyntaxAnalysis: function (content, type, length) {
@@ -192,6 +221,8 @@ function Blade(tpl, vars) {
 
                 // 标签解析
                 foreachTpl = parse_tag(foreachTpl)
+
+                foreachTpl = parse_custom_tag(foreachTpl)
 
                 if (has('foreach', foreachTpl)) {
                     foreachTpl = parse_expression_foreach(foreachTpl, 'test')
@@ -400,5 +431,9 @@ function Blade(tpl, vars) {
             return 0
         }
         return t.length
+    }
+    // 去除空行
+    function trim(tpl) {
+        return tpl.replace(/(^\s*)|(\s*$)/g, "")
     }
 }
