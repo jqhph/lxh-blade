@@ -132,7 +132,10 @@ function Blade(tpl, vars) {
             tagName = tagName[0].replace(store.placeholders.$end, '')
             for (var i in store.placeholders.$customTags) {
                 if (i == tagName) {
-                    return store.placeholders.$customTags[i](self, trim(compile_tags.transVar($match, false).replace(/'|"/g, '')).split(' '))
+                    var d = trim(compile_tags.transVar($match, false).replace(/'|"/g, ''))
+                    return store.placeholders.$customTags[i](
+                        self, d.split(' '), d
+                    )
                 }
             }
             return full
