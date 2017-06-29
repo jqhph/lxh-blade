@@ -128,14 +128,13 @@ function Blade(tpl, vars) {
     // 自定义标签解析
     var parse_custom_tag = function (tpl) {
         return tpl.replace(store.regs.customTag, function (full, $match, position) {
-            var tagName = $match.match(store.regs.tagName), $match = $match.replace(tagName[0], "")
+            var tagName = $match.match(store.regs.tagName), d, i
+            $match = $match.replace(tagName[0], "")
             tagName = tagName[0].replace(store.placeholders.$end, '')
-            for (var i in store.placeholders.$customTags) {
+            for (i in store.placeholders.$customTags) {
                 if (i == tagName) {
-                    var d = trim(compile_tags.transVar($match, false).replace(/'|"/g, ''))
-                    return store.placeholders.$customTags[i](
-                        self, d.split(' '), d
-                    )
+                    d = trim(compile_tags.transVar($match, false).replace(/'|"/g, ''))
+                    return store.placeholders.$customTags[i](self, d.split(' '), d)
                 }
             }
             return full
