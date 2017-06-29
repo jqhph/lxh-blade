@@ -7,7 +7,7 @@
 
 ```html
 <div>
-    @foreach {list} {row}
+    @foreach {list} {k} {row}
       @if {row.age} == 18
         <h4><span>18岁</span></h4>
       @elseif {row.age} == 19
@@ -23,13 +23,28 @@
       @endforeach
 
       <p {@compare row.age > 19 ?? 'style="color:red"'} >
-          {@compare row.age >= 20 ?? row.name :: 1}
+          模板标签：{@compare row.age >= 20 ?? row.name :: 1}
       </p>
-    @endforeach
+      
+      <div>自定义标签：{@incr k 3 @}</div>
+    @endforeach
 </div>
 ```
 
 ```js
+/**
+ * 添加自定义标签
+ *
+ * @param string  标签名称
+ * @param function 自定义标签处理方法
+ */ 
+BladeConfig.addTag('incr', function ($view, options, tpl) {
+    // options[0] 既是上面模板中k的值
+    // 设置步长值默认为1
+    var step = options[1] || 1
+    return parseInt(options[0]) + step
+})
+
 var vars = {
   list: [
     {name: '小猫', age: 18, attrs: {'花色', '淘气'}},
@@ -56,6 +71,18 @@ setTimeout(function () {
   view.rerander(vars)
 }, 3000)
 
+/**
+ * 添加自定义标签
+ *
+ * @param string   name 标签名称
+ * @param function call 自定义标签处理方法
+ *  call回调函数接受3个参数， 1. Blade对象，2. 自定义标签传入的参数数组， 3. 解析后的自定义标签内容字符串
+ */ 
+BladeConfig.addTag(name, call)
+```
+
+## 接口
+```js
 // 其余接口说明
 /**
  * @param string|object 模板变量key，当传入的值为一个“object”类型时则会替换所有的键值对
@@ -73,6 +100,9 @@ view.fetch(vars)
 
 // 获取原模板内容
 view.getTpl()
+
+// 添加自定义标签
+
 ```
 
 ## 模板
@@ -93,9 +123,12 @@ view.getTpl()
 @else                       // 必须换行
 @endif                      // 换行或作为结束字符串
 
-// 标签说明
-// 三木运算，“:: value2”可省略
+// 标签
+// 三目运算，“:: value2”可省略
 {@compare ... ?? value1 :: value2}
+
+//自定义标签
+{@名称 ... @}
 
 ```
 
