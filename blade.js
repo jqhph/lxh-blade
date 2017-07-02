@@ -11,7 +11,7 @@ window.BladeConfig = {
     }
 }
 
-function Blade(tpl, vars) {
+window.Blade = function (tpl, vars) {
     var store = {
         // 渲染节点
         selector: '#blade',
