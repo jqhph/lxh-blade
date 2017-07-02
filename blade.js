@@ -222,14 +222,14 @@ function Blade(tpl, vars) {
                 }
                 self.assign(get_var_name(value), list[i])
 
+                if (has('foreach', foreachTpl)) {
+                    foreachTpl = parse_expression_foreach(foreachTpl, 'test')
+                }
+                
                 // 标签解析
                 foreachTpl = parse_tag(foreachTpl)
 
                 foreachTpl = parse_custom_tag(foreachTpl)
-
-                if (has('foreach', foreachTpl)) {
-                    foreachTpl = parse_expression_foreach(foreachTpl, 'test')
-                }
 
                 // 解析foreach循环里面的if表达式
                 content += parse_expression_if(foreachTpl)
