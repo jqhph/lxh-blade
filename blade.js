@@ -1,8 +1,11 @@
 /**
+ * version 1.0-dev
+ *
  * Created by Jqh on 2017/6/22.
  */
 
 window.BladeConfig = {
+    version: '1.0-dev',
     customTags: {},
     // 添加自定义标签
     addTag: function (name, call) {
@@ -11,7 +14,7 @@ window.BladeConfig = {
     }
 }
 
-function Blade(tpl, vars) {
+window.Blade = function (tpl, vars) {
     var store = {
         // 渲染节点
         selector: '#blade',
@@ -37,9 +40,6 @@ function Blade(tpl, vars) {
             },
             $customTags: {}
         },
-        comparison: {
-            // '&gt;': '>', '&lt;': '<', '&amp;': '&'
-        },
         regs: {
             // 普通变量，精确匹配 var: /{([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]+[0-9]*[_]*)+([\[]?[a-z0-9_]*[\]]?))}/gi,
             $var: /{([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]*[0-9]*[_]*)+([\[]?([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]*[0-9]*[_]*)+)[\]]?))}/gi,
@@ -52,6 +52,12 @@ function Blade(tpl, vars) {
             tag: /{(@[^{|{#]+)}/gi,
             tagName: /@[a-z]*\b/i,
             customTag: /{(@[^{|{#]+)@}/gi,
+            '@if': /@if\b/gi,
+            '@endif': /@endif\b/gi,
+            '@elseif': /@elseif\b/gi,
+            '@else': /@else\b/gi,
+            '@foreach': /@foreach\b/gi,
+            '@endforeach': /@endforeach\b/gi,
         },
         model: {
             $if: "\n if ({exp}) { \n {content} \n } \n",
@@ -77,14 +83,21 @@ function Blade(tpl, vars) {
     // 解析并获取模板内容
     this.fetch = function (vars) {
         store.vars = vars || store.vars
-        var tpl = store.tpl
+
         // 语法检测
-        syntax_analysis(tpl);
+        syntax_analysis(store.tpl)
+
         // 模板表达式解析
-        var tpl = parse_expression(tpl)
-        // 普通变量解析
-        return parse_var(tpl)
-    };
+        return parse_var(
+            parse_custom_tag(
+                parse_tag(
+                    parse_expression_if(
+                        parse_expression_foreach(store.tpl)
+                    )
+                )
+            )
+        )
+    }
 
     // 渲染模板
     this.render = function (selector, callback) {
@@ -111,28 +124,16 @@ function Blade(tpl, vars) {
         }
     }
 
-    // 模板表达式解析
-    var parse_expression = function (tpl) {
-        // foreach
-        tpl = parse_expression_foreach(tpl)
-        // 标签解析
-        tpl = parse_tag(tpl)
-        // 自定义标签解析
-        tpl = parse_custom_tag(tpl)
-        // if
-        tpl = parse_expression_if(tpl)
-        // values = values.replace(/[\s\n]/gi, "")
-        return (tpl != 'undefined' ? tpl : '')
-    }
-
     // 自定义标签解析
     var parse_custom_tag = function (tpl) {
         return tpl.replace(store.regs.customTag, function (full, $match, position) {
-            var tagName = $match.match(store.regs.tagName), $match = $match.replace(tagName[0], "")
+            var tagName = $match.match(store.regs.tagName), d, i
+            $match = $match.replace(tagName[0], "")
             tagName = tagName[0].replace(store.placeholders.$end, '')
-            for (var i in store.placeholders.$customTags) {
+            for (i in store.placeholders.$customTags) {
                 if (i == tagName) {
-                    return store.placeholders.$customTags[i](self, trim(compile_tags.transVar($match, false).replace(/'|"/g, '')).split(' '))
+                    d = trim(compile_tags.transVar($match, false).replace(/'|"/g, ''))
+                    return store.placeholders.$customTags[i](self, d.split(' '), d)
                 }
             }
             return full
@@ -146,7 +147,7 @@ function Blade(tpl, vars) {
             tagName = tagName[0]
             for (var i in store.placeholders.$tags) {
                 if (tagName == store.placeholders.$tags[i]) {
-                    return compile_tags[i](comparison_replace($match.replace(tagName, "")))
+                    return compile_tags[i]($match.replace(tagName, ""))
                 }
             }
             return full
@@ -192,14 +193,13 @@ function Blade(tpl, vars) {
     var parse_expression_foreach = function (tpl, test) {
         return tpl.replace(store.regs.$foreach, function (full, $match, position) {
             var results = get_exp_and_content('foreach', 'endforeach', full, true, true)
-            var foreachTpl = ''
             var tmpExps = results.exp.split(' '), exps = []
             for (var i = 0; i < tmpExps.length; i++) {
                 if (!tmpExps[i] || tmpExps[i] == "\n")  continue
                 exps.push(tmpExps[i].replace(/[\s\n]/gi, ""))
             }
 
-            var content = '', list = [], key = null, value, i
+            var content = '', list = [], key = null, value, i, foreachTpl, hasSubForeach = false
             // 获取循环list数组
             list = exps.shift()
             list = get_var_name(list)
@@ -214,26 +214,27 @@ function Blade(tpl, vars) {
                 if (typeof list[i] == 'function') {
                     continue
                 }
+
                 foreachTpl = results.content
+
                 if (key) {
                     self.assign(get_var_name(key), i)
                 }
                 self.assign(get_var_name(value), list[i])
 
-                // 标签解析
-                foreachTpl = parse_tag(foreachTpl)
-
-                foreachTpl = parse_custom_tag(foreachTpl)
-
-                if (has('foreach', foreachTpl)) {
+                if (hasSubForeach || has('foreach', foreachTpl)) {
+                    hasSubForeach = true
                     foreachTpl = parse_expression_foreach(foreachTpl, 'test')
                 }
 
-                // 解析foreach循环里面的if表达式
-                content += parse_expression_if(foreachTpl)
-
-                // 解析变量
-                content = parse_var(content)
+                // 解析foreach循环里面的标签、if表达式、变量
+                content += parse_var(
+                    parse_custom_tag(
+                        parse_tag(
+                            parse_expression_if(foreachTpl)
+                        )
+                    )
+                )
             }
             return content
         })
@@ -251,7 +252,7 @@ function Blade(tpl, vars) {
             var evalString = get_eval_string('if', ifContent, 0)
 
             // 计算elseif出现次数
-            var elseifTimes = get_length(store.placeholders.$elseif, full)
+            var elseifTimes = get_length('elseif', full)
 
             // 解析elseif
             for (var i = 1; i <= elseifTimes; i++) {
@@ -263,14 +264,14 @@ function Blade(tpl, vars) {
                 evalString += get_eval_string('elseif', tmp, i)
             }
 
-            var elseTimes = get_length(store.placeholders.$else, full)
+            var elseTimes = get_length('else', full)
 
             // 解析else
             if (elseTimes) {
                 tmp = get_exp_and_content('else', 'end', full)
 
                 if (tmp.full) {
-                    full = tmp.full.replace(store.placeholders.$else, "")
+                    full = tmp.full.replace('else', "")
                 }
 
                 allContents.push(tmp.content)
@@ -325,24 +326,25 @@ function Blade(tpl, vars) {
     function syntax_analysis(tpl) {
         var msg = 'Syntax error: '
         // 计算if次数
-        var ifTimes = get_length(store.placeholders.$if, tpl), endifTimes = get_length(store.placeholders.$endif, tpl)
+        var ifTimes = get_length('if', tpl), endifTimes = get_length('endif', tpl)
+
         if (ifTimes > endifTimes) {
             throw new Error(msg + 'miss "' + store.placeholders.$endif + '"')
         } else if (ifTimes < endifTimes) {
             throw new Error(msg + 'miss "' + store.placeholders.$if + '"')
         }
         // 计算else次数
-        var elseTimes = get_length(store.placeholders.$else, tpl)
+        var elseTimes = get_length('else', tpl)
         if (elseTimes > ifTimes) {
             throw new Error(msg + 'redundant "' + store.placeholders.$else + '" placeholder')
         }
-        var elseifTimes = get_length(store.placeholders.$elseif, tpl)
+        var elseifTimes = get_length('elseif', tpl)
         if (ifTimes == 0 && elseifTimes > 0) {
             throw new Error(msg + 'redundant "' + store.placeholders.$elseif + '" placeholder')
         }
         // 计算foreach
-        var foreachTimes = get_length(store.placeholders.$foreach, tpl)
-        var endforeachTimes = get_length(store.placeholders.$endforeach, tpl)
+        var foreachTimes = get_length('foreach', tpl)
+        var endforeachTimes = get_length('endforeach', tpl)
         if (foreachTimes > endforeachTimes) {
             throw new Error(msg + 'miss "' + store.placeholders.$endforeach + '"')
         } else if (foreachTimes < endforeachTimes) {
@@ -358,17 +360,8 @@ function Blade(tpl, vars) {
     function get_eval_string(type, tmp, i) {
         var exp = parse_var(tmp.exp, null, true, '')
 
-        exp = comparison_replace(exp)
         var str = store.model['$' + type].replace('{exp}', exp)
         return str.replace('{content}', 'var key = "' + i + '"')
-    }
-
-    // 表达式特殊字符串转换
-    function comparison_replace(exp) {
-        // for (var k in store.comparison) {
-        //     exp = exp.replace(new RegExp(k, 'gi'), store.comparison[k])
-        // }
-        return exp
     }
 
     // 判断模板是否含有表达式标签
@@ -427,7 +420,7 @@ function Blade(tpl, vars) {
 
     // 计算表达式出现次数
     function get_length(type, tpl) {
-        var t = tpl.match(new RegExp(type + '[\s]*', 'gi'))
+        var t = tpl.match(store.regs[store.placeholders['$'+type]])
         if (!t) {
             return 0
         }
