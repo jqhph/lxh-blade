@@ -45,7 +45,7 @@ window.Blade = function (tpl, vars) {
             $var: /{([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]*[0-9]*[_]*)+([\[]?([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]*[0-9]*[_]*)+)[\]]?))}/gi,
             stringVar: /[\[]([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]*[0-9]*[_]*)+)[\]]/gi,
             // js变量（非模板变量）
-            jsvar: /[ ]+((?![\'|\"])[\[_\.\]a-z]+[0-9\]]*)+[ ]*/gi,
+            jsvar: /[ ]*((?![\'|\"])[\[_\.\]a-z]+[0-9\]]*)+[ ]*/gi,
             $if: /@if[ ]+([\s\S.])+@endif\b/gi,
             $foreach: /@foreach[ ]+([\s\S.])+@endforeach\b/gi,
             // 标签，精确匹配
@@ -127,13 +127,34 @@ window.Blade = function (tpl, vars) {
     // 自定义标签解析
     var parse_custom_tag = function (tpl) {
         return tpl.replace(store.regs.customTag, function (full, $match, position) {
-            var tagName = $match.match(store.regs.tagName), d, i
+            var tagName = $match.match(store.regs.tagName), d, i, j, o, t, q
+
             $match = $match.replace(tagName[0], "")
+
             tagName = tagName[0].replace(store.placeholders.$end, '')
+
             for (i in store.placeholders.$customTags) {
                 if (i == tagName) {
-                    d = trim(compile_tags.transVar($match, false).replace(/'|"/g, ''))
-                    return store.placeholders.$customTags[i](self, d.split(' '), d)
+                    d = trim(compile_tags.transVar($match, false, '!!'))
+
+                    d = d.split('!!')
+
+                    // 解析变量，并把解析后的变量放置到一个数组中s
+                    t = []
+                    for (j in d) {
+                        if (d[j].indexOf('{') === 0 && d[j].indexOf('}') != -1) {
+                            d[j] = JSON.parse(d[j])
+                            t.push(d[j])
+                        } else {
+                            d[j] = d[j].replace(/'|"/g, '')
+                            o = d[j].split(' ')
+                            for (q in o) {
+                                if (o[q]) t.push(o[q])
+                            }
+                        }
+                    }
+
+                    return store.placeholders.$customTags[i](self, t, d)
                 }
             }
             return full
@@ -176,9 +197,11 @@ window.Blade = function (tpl, vars) {
 
         },
         // 翻译变量
-        transVar: function (tpl, toString) {
+        transVar: function (tpl, toString, delimiter) {
+            delimiter = delimiter || ' '
             return tpl.replace(store.regs.jsvar, function (full, $match) {
-                return trans_var($match, null, toString) + ' '
+                var d = trans_var($match, null, toString)
+                return (typeof d == 'object' ? delimiter + JSON.stringify(d) + delimiter : delimiter + d + delimiter)
             })
         },
         compareSyntaxAnalysis: function (content, type, length) {
@@ -190,7 +213,7 @@ window.Blade = function (tpl, vars) {
         }
     }
 
-    var parse_expression_foreach = function (tpl, test) {
+    var parse_expression_foreach = function (tpl) {
         return tpl.replace(store.regs.$foreach, function (full, $match, position) {
             var results = get_exp_and_content('foreach', 'endforeach', full, true, true)
             var tmpExps = results.exp.split(' '), exps = []
@@ -224,7 +247,7 @@ window.Blade = function (tpl, vars) {
 
                 if (hasSubForeach || has('foreach', foreachTpl)) {
                     hasSubForeach = true
-                    foreachTpl = parse_expression_foreach(foreachTpl, 'test')
+                    foreachTpl = parse_expression_foreach(foreachTpl)
                 }
 
                 // 解析foreach循环里面的标签、if表达式、变量
@@ -400,7 +423,7 @@ window.Blade = function (tpl, vars) {
         // 检测是否存在嵌套if表达式标签
         if (has(startType, values)) {
             if (startType == 'if') {
-                values = parse_expression_if(values, 'test')
+                values = parse_expression_if(values)
             }
         }
         // 获取if表达式主体内容
