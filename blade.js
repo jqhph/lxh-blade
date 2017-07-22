@@ -36,7 +36,7 @@ window.Blade = function (tpl, vars) {
             $endforeach: '@endforeach',
             $end: '@',
             $tags: {
-                compare: '@compare'
+                compare: '#compare'
             },
             $customTags: {}
         },
@@ -46,12 +46,13 @@ window.Blade = function (tpl, vars) {
             stringVar: /[\[]([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]*[0-9]*[_]*)+)[\]]/gi,
             // js变量（非模板变量）
             jsvar: /[ ]*((?![\'|\"])[\[_\.\]a-z]+[0-9\]]*)+[ ]*/gi,
+            compareJsvar: /[ ]+((?![\'|\"])[\[_\.\]a-z]+[0-9\]]*)+[ ]*/gi,
             $if: /@if[ ]+([\s\S.])+@endif\b/gi,
             $foreach: /@foreach[ ]+([\s\S.])+@endforeach\b/gi,
             // 标签，精确匹配
-            tag: /{(@[^{|{#]+)}/gi,
-            tagName: /@[a-z]*\b/i,
-            customTag: /{(@[^{|{#]+)@}/gi,
+            tag: /{(#[^{|{#]+)}/gi,
+            tagName: /#[a-z]*\b/i,
+            customTag: /{(#[^{|{#]+)#}/gi,
             '@if': /@if\b/gi,
             '@endif': /@endif\b/gi,
             '@elseif': /@elseif\b/gi,
@@ -131,7 +132,7 @@ window.Blade = function (tpl, vars) {
 
             $match = $match.replace(tagName[0], "")
 
-            tagName = tagName[0].replace(store.placeholders.$end, '')
+            tagName = tagName[0].replace('#', '')
 
             for (i in store.placeholders.$customTags) {
                 if (i == tagName) {
@@ -191,15 +192,23 @@ window.Blade = function (tpl, vars) {
                     exp += ' var result = ' + this.transVar(content[i], true)
                 }
             }
-            exp = 'if (' + this.transVar(tagContent[0], true) + ') ' + exp + '}'
+            exp = 'if (' + this.compareTransVar(tagContent[0], true) + ') ' + exp + '}'
             eval(exp)
             return result || ''
 
         },
-        // 翻译变量
+        // 翻译变量  compareJsvar
         transVar: function (tpl, toString, delimiter) {
             delimiter = delimiter || ' '
             return tpl.replace(store.regs.jsvar, function (full, $match) {
+                var d = trans_var($match, null, toString)
+                return (typeof d == 'object' ? delimiter + JSON.stringify(d) + delimiter : delimiter + d + delimiter)
+            })
+        },
+        // 翻译compare标签变量
+        compareTransVar: function (tpl, toString, delimiter) {
+            delimiter = delimiter || ' '
+            return tpl.replace(store.regs.compareJsvar, function (full, $match) {
                 var d = trans_var($match, null, toString)
                 return (typeof d == 'object' ? delimiter + JSON.stringify(d) + delimiter : delimiter + d + delimiter)
             })
@@ -303,11 +312,12 @@ window.Blade = function (tpl, vars) {
             }
 
             eval(evalString)
+
             if (full) {
                 full = full.replace(store.placeholders.$endif, "")
             }
 
-            return (parse_var(allContents[key]) || '') + full
+            return (parse_var(parse_custom_tag(parse_tag(allContents[key]))) || '') + full
         })
     }
 
@@ -322,7 +332,11 @@ window.Blade = function (tpl, vars) {
     var trans_var = function ($var, vars, toString, $default) {
         if ($var.indexOf('[') == -1) {
             if (toString) {
-                return '"' + get_var($var, vars, $default) + '"'
+                var t = get_var($var, vars, $default)
+                if (typeof t == 'object') {
+                    return JSON.stringify(t)
+                }
+                return '"' + t + '"'
             }
             return get_var($var, vars, $default)
         } else {
@@ -382,7 +396,6 @@ window.Blade = function (tpl, vars) {
 
     function get_eval_string(type, tmp, i) {
         var exp = parse_var(tmp.exp, null, true, '')
-
         var str = store.model['$' + type].replace('{exp}', exp)
         return str.replace('{content}', 'var key = "' + i + '"')
     }
@@ -426,6 +439,7 @@ window.Blade = function (tpl, vars) {
                 values = parse_expression_if(values)
             }
         }
+
         // 获取if表达式主体内容
         var content = ''
         if (getAll) {
