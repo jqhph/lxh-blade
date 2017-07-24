@@ -143,7 +143,7 @@ window.Blade = function (tpl, vars) {
                     // 解析变量，并把解析后的变量放置到一个数组中s
                     t = []
                     for (j in d) {
-                        if (d[j].indexOf('{') === 0 && d[j].indexOf('}') != -1) {
+                        if (is_object(d[j])) {
                             d[j] = JSON.parse(d[j])
                             t.push(d[j])
                         } else {
@@ -162,8 +162,18 @@ window.Blade = function (tpl, vars) {
         })
     }
 
+    var is_object = function (d) {
+        if ((d.indexOf('{') === 0 && d.indexOf('}') != -1) ||
+            (d.indexOf('[') === 0 && d.indexOf(']') != -1)
+        ) {
+            return true
+        }
+        return false
+    }
+
     // 标签解析
     var parse_tag = function (tpl) {
+        if (! tpl) return ''
         return tpl.replace(store.regs.tag, function (full, $match, position) {
             var tagName = $match.match(store.regs.tagName)
             tagName = tagName[0]
