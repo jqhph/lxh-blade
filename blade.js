@@ -45,7 +45,7 @@ window.Blade = function (tpl, vars) {
             $var: /{([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]*[0-9]*[_]*)+([\[]?([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]*[0-9]*[_]*)+)[\]]?))}/gi,
             stringVar: /[\[]([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]*[0-9]*[_]*)+)[\]]/gi,
             // js变量（非模板变量）
-            jsvar: /[ ]*((?![\'|\"])[\[_\.\]a-z]+[0-9\]]*)+[ ]*/gi,
+            jsvar: /[ ]((?![\'|\"])[\[_\.\]a-z]+[0-9\]]*)+[ ]*/gi,
             compareJsvar: /[ ]+((?![\'|\"])[\[_\.\]a-z]+[0-9\]]*)+[ ]*/gi,
             $if: /@if[ ]+([\s\S.])+@endif\b/gi,
             $foreach: /@foreach[ ]+([\s\S.])+@endforeach\b/gi,
@@ -135,29 +135,26 @@ window.Blade = function (tpl, vars) {
             tagName = tagName[0].replace('#', '')
 
             for (i in store.placeholders.$customTags) {
-                if (i == tagName) {
-                    d = trim(compile_tags.transVar($match, false, '!!'))
+                if (i != tagName) continue
+                d = trim(compile_tags.transVar($match, false, '!!'))
 
-                    d = d.split('!!')
+                d = d.split('!!')
 
-                    // 解析变量，并把解析后的变量放置到一个数组中s
-                    t = []
-                    t.push(self)
-                    for (j in d) {
-                        if (is_object(d[j])) {
-                            d[j] = JSON.parse(d[j])
-                            t.push(d[j])
-                        } else {
-                            d[j] = d[j].replace(/'|"/g, '')
-                            o = d[j].split(' ')
-                            for (q in o) {
-                                if (o[q]) t.push(o[q])
-                            }
-                        }
+                // 解析变量，并把解析后的变量放置到一个数组中s
+                t = []
+                t.push(self)
+                for (j in d) {
+                    if (typeof d[j] == 'function') continue
+                    if (is_object(d[j])) {
+                        d[j] = JSON.parse(d[j])
+                        t.push(d[j])
+                    } else {
+                        d[j] = d[j].replace(/'|"/g, '')
+                        if (typeof d[j] != 'function') t.push(d[j])
                     }
-
-                    return store.placeholders.$customTags[i].apply(self, t)
                 }
+
+                return store.placeholders.$customTags[i].apply(self, t)
             }
             return full
         })
