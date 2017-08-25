@@ -142,6 +142,7 @@ window.Blade = function (tpl, vars) {
 
                     // 解析变量，并把解析后的变量放置到一个数组中s
                     t = []
+                    t.push(self)
                     for (j in d) {
                         if (is_object(d[j])) {
                             d[j] = JSON.parse(d[j])
@@ -155,7 +156,7 @@ window.Blade = function (tpl, vars) {
                         }
                     }
 
-                    return store.placeholders.$customTags[i](self, t, d)
+                    return store.placeholders.$customTags[i].apply(self, t)
                 }
             }
             return full
