@@ -14,6 +14,16 @@ window.BladeConfig = {
     }
 }
 
+window.BladeConfig = {
+    version: '1.0-dev',
+    customTags: {},
+    // 添加自定义标签
+    addTag: function (name, call) {
+        if (typeof call != 'function')  throw new Error('Invalid argument')
+        this.customTags[name] = call
+    }
+}
+
 window.Blade = function (tpl, vars) {
     var store = {
         // 渲染节点
@@ -45,7 +55,7 @@ window.Blade = function (tpl, vars) {
             $var: /{([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]*[0-9]*[_]*)+([\[]?([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]*[0-9]*[_]*)+)[\]]?))}/gi,
             stringVar: /[\[]([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]*[0-9]*[_]*)+)[\]]/gi,
             // js变量（非模板变量）
-            jsvar: /[ ]((?![\'|\"])[\[_\.\]a-z]+[0-9\]]*)+[ ]*/gi,
+            jsvar: /[ ]([\'|\"]*[\[_\.\]a-z]+[0-9\]]*[\'|\"]*)+/gi,///[ ]((?![\'|\"])[\[_\.\]a-z]+[0-9\]]*)+/gi
             compareJsvar: /[ ]+((?![\'|\"])[\[_\.\]a-z]+[0-9\]]*)+[ ]*/gi,
             $if: /@if[ ]+([\s\S.])+@endif\b/gi,
             $foreach: /@foreach[ ]+([\s\S.])+@endforeach\b/gi,
@@ -146,11 +156,11 @@ window.Blade = function (tpl, vars) {
                 for (j in d) {
                     if (typeof d[j] == 'function') continue
                     if (is_object(d[j])) {
-                        d[j] = JSON.parse(d[j])
+                        d[j] = JSON.parse(trim(d[j]))
                         t.push(d[j])
                     } else {
                         d[j] = d[j].replace(/'|"/g, '')
-                        if (typeof d[j] != 'function') t.push(d[j])
+                        if (typeof d[j] != 'function') t.push(trim(d[j]))
                     }
                 }
 
@@ -208,9 +218,12 @@ window.Blade = function (tpl, vars) {
         // 翻译变量  compareJsvar
         transVar: function (tpl, toString, delimiter) {
             delimiter = delimiter || ' '
+            var i = 0, d, s = delimiter, e = delimiter
             return tpl.replace(store.regs.jsvar, function (full, $match) {
-                var d = trans_var($match, null, toString)
-                return (typeof d == 'object' ? delimiter + JSON.stringify(d) + delimiter : delimiter + d + delimiter)
+                d = trans_var($match, null, toString)
+                i++
+                if (i == 1) s = ''
+                return (typeof d == 'object' ? s + JSON.stringify(d) + e : s + d + e)
             })
         },
         // 翻译compare标签变量
