@@ -45,23 +45,23 @@ window.Blade = function (tpl, vars) {
             $endforeach: '@endforeach',
             $end: '@',
             $tags: {
-                compare: '#compare'
+                compare: '@compare'
             },
             $customTags: {}
         },
         regs: {
             // 普通变量，精确匹配 var: /{([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]+[0-9]*[_]*)+([\[]?[a-z0-9_]*[\]]?))}/gi,
-            $var: /{([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]*[0-9]*[_]*)+([\[]?([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]*[0-9]*[_]*)+)[\]]?))}/gi,
-            stringVar: /[\[]([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]*[0-9]*[_]*)+)[\]]/gi,
+            $var: /{([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]*[0-9]*[_]*)+([\[]?[\'|\"]?([a-z|_]*[0-9]*[_]*[\.]*([a-z|_]*[0-9]*[_]*)+)[\'|\"]?[\]]?))}/gi,
+            stringVar: /[\[]([\'|\"]?[a-z|_]*[0-9]*[_]*[\.]*([a-z|_]*[0-9]*[_]*)+[\'|\"]?)[\]]/gi,
             // js变量（非模板变量）
             jsvar: /[ ]([\'|\"]*[\[_\.\]a-z]+[0-9\]]*[\'|\"]*)+/gi,///[ ]((?![\'|\"])[\[_\.\]a-z]+[0-9\]]*)+/gi
             compareJsvar: /[ ]+((?![\'|\"])[\[_\.\]a-z]+[0-9\]]*)+[ ]*/gi,
             $if: /@if[ ]+([\s\S.])+@endif\b/gi,
             $foreach: /@foreach[ ]+([\s\S.])+@endforeach\b/gi,
             // 标签，精确匹配
-            tag: /{(#[^{|{#]+)}/gi,
-            tagName: /#[a-z]*\b/i,
-            customTag: /{(#[^{|{#]+)#}/gi,
+            tag: /{(@[^{|{@]+)}/gi,
+            tagName: /@[a-z]*\b/i,
+            customTag: /{(@[^{|{@]+)@}/gi,
             '@if': /@if\b/gi,
             '@endif': /@endif\b/gi,
             '@elseif': /@elseif\b/gi,
@@ -229,7 +229,7 @@ window.Blade = function (tpl, vars) {
         compareTransVar: function (tpl, toString, delimiter) {
             delimiter = delimiter || ' ';
             return tpl.replace(store.regs.compareJsvar, function (full, $match) {
-                var d = trans_var($match, null, toString)
+                var d = trans_var($match, null, toString);
                 return (typeof d == 'object' ? delimiter + JSON.stringify(d) + delimiter : delimiter + d + delimiter)
             })
         },
@@ -349,10 +349,10 @@ window.Blade = function (tpl, vars) {
         })
     };
 
-    var trans_var = function ($var, vars, toString, $default) {
+    var trans_var = function ($var, data, toString, $default) {
         if ($var.indexOf('[') == -1) {
             if (toString) {
-                var t = get_var($var, vars, $default);
+                var t = get_var($var, data, $default);
                 if (typeof t == 'object') {
                     return JSON.stringify(t);
                 } else if (typeof t == 'boolean') {
@@ -360,13 +360,31 @@ window.Blade = function (tpl, vars) {
                 }
                 return '"' + t + '"';
             }
-            return get_var($var, vars, $default)
-        } else {
-            return get_var($var.replace(store.regs.stringVar, function (f, $m) {
-                return '.' + get_var($m, vars, $default)
-            }), $default)
+            return get_var($var, data, $default)
         }
-    }
+        var objkey = $var.replace(store.regs.stringVar, '').replace('[]', ''),
+            obj = get_var(
+            objkey,
+            data,
+            $default || {}
+        ),
+        k = $var.match(store.regs.stringVar);
+
+        if (!k) return $default;
+        k = k[0].replace(/^\[+|\]+$/gm,'');
+        var dot = /\'+|\"+/gm;
+
+        if (is_num(k)) {
+            return get_var(k, obj, $default);
+        }
+        if (dot.test(k)) {
+            return get_var(k.replace(dot, ""), obj, $default);
+        }
+        return get_var(
+            get_var(k, vars), obj, $default
+        );
+
+    };
 
     // 解析变量
     var get_var = function ($key, vars, $default) {
@@ -379,6 +397,13 @@ window.Blade = function (tpl, vars) {
             }
         }
         return $lastItem;
+    }
+
+    function is_num(x) {
+        return / ^\d+$/.test(x) || /^\-[1-9][0-9]*$/.test(x);
+    }
+    function is_string(x) {
+        return typeof x == 'string';
     }
 
     // 语法检测
@@ -417,10 +442,18 @@ window.Blade = function (tpl, vars) {
     }
 
     function get_eval_string(type, tmp, i) {
-        var exp = parse_var(tmp.exp, null, true, '');
-        var str = store.model['$' + type].replace('{exp}', exp);
+        var exp = parse_eval_var(tmp.exp, null, true, false),
+            str = store.model['$' + type].replace('{exp}', exp);
         return str.replace('{content}', 'var key = "' + i + '"')
     }
+
+    // 解析变量
+    var parse_eval_var = function (tpl, vars, toString, $default) {
+        if (!tpl) return null;
+        return tpl.replace(store.regs.$var, function (full, $match, position) {
+            return "trans_var('"+ $match.replace(/\'+/gm, "\\'") +"', null, false, false)"
+        })
+    };
 
     // 判断模板是否含有表达式标签
     function has(type, content) {
