@@ -364,11 +364,11 @@ window.Blade = function (tpl, vars) {
         }
         var objkey = $var.replace(store.regs.stringVar, '').replace('[]', ''),
             obj = get_var(
-            objkey,
-            data,
-            $default || {}
-        ),
-        k = $var.match(store.regs.stringVar);
+                objkey,
+                data,
+                $default || {}
+            ),
+            k = $var.match(store.regs.stringVar);
 
         if (!k) return $default;
         k = k[0].replace(/^\[+|\]+$/gm,'');
@@ -397,7 +397,7 @@ window.Blade = function (tpl, vars) {
             }
         }
         return $lastItem;
-    }
+    };
 
     function is_num(x) {
         return / ^\d+$/.test(x) || /^\-[1-9][0-9]*$/.test(x);
@@ -442,16 +442,16 @@ window.Blade = function (tpl, vars) {
     }
 
     function get_eval_string(type, tmp, i) {
-        var exp = parse_eval_var(tmp.exp, null, true, false),
+        var exp = parse_eval_var(tmp.exp),
             str = store.model['$' + type].replace('{exp}', exp);
         return str.replace('{content}', 'var key = "' + i + '"')
     }
 
     // 解析变量
-    var parse_eval_var = function (tpl, vars, toString, $default) {
+    var parse_eval_var = function (tpl) {
         if (!tpl) return null;
         return tpl.replace(store.regs.$var, function (full, $match, position) {
-            return "trans_var('"+ $match.replace(/\'+/gm, "\\'") +"', null, false, false)"
+            return "___trans__var___('"+ $match.replace(/\'+/gm, "\\'") +"', null, false, false)"
         })
     };
 
@@ -522,4 +522,6 @@ window.Blade = function (tpl, vars) {
     function trim(tpl) {
         return tpl.replace(/(^\s*)|(\s*$)/g, "")
     }
+
+    window.___trans__var___ = trans_var;
 };
